@@ -163,6 +163,9 @@ func (r *Runner) Init() {
 	if r.cfg.NetworkType == config.NetworkTypeIB {
 		r.Runtime.MgmtdProtocol = "IPoIB"
 	}
+	if r.cfg.NetworkType == config.NetworkTypeTCP {
+		r.Runtime.MgmtdProtocol = "TCP"
+	}
 	r.Runtime.Nodes = make(map[string]config.Node, len(r.cfg.Nodes))
 	for _, node := range r.cfg.Nodes {
 		r.Runtime.Nodes[node.Name] = node

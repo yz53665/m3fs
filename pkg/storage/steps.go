@@ -102,8 +102,12 @@ func (s *syncNodeDisksStep) createDirDisks() error {
 		return errors.Trace(err)
 	}
 	err = s.db.Transaction(func(tx *gorm.DB) error {
+		basePath := storCfg.DiskBasePath
+		if basePath == "" {
+			basePath = path.Join(getServiceWorkDir(s.Runtime.WorkDir), "3fsdata")
+		}
 		for i := range storCfg.DiskNumPerNode {
-			name := path.Join(getServiceWorkDir(s.Runtime.WorkDir), "3fsdata", fmt.Sprintf("data%d", i))
+			name := path.Join(basePath, fmt.Sprintf("data%d", i))
 			_, ok := existDisks[name]
 			if ok {
 				s.Logger.Debugf("Disk %s already exists, skipping creation", name)

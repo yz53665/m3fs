@@ -102,7 +102,7 @@ proc_thread_pool_stratetry = 'SHARED_QUEUE'
 [[server.base.groups]]
 check_connections_interval = '1min'
 connection_expiration_time = '1day'
-network_type = 'RDMA'
+network_type = '{{ .MgmtdProtocol }}'
 services = [ 'StorageSerde' ]
 use_independent_thread_pool = false
 
@@ -144,7 +144,7 @@ max_connections = 1
 [server.base.groups.listener]
 domain_socket_index = 1
 filter_list = []
-listen_port = {{ .RDMAListenPort }}
+listen_port = {{ if eq .MgmtdProtocol "TCP" }}{{ .TCPListenPort }}{{ else }}{{ .RDMAListenPort }}{{ end }}
 listen_queue_depth = 4096
 rdma_accept_timeout = '15s'
 rdma_listen_ethernet = true
@@ -202,7 +202,7 @@ max_connections = 1
 [server.base.groups.listener]
 domain_socket_index = 1
 filter_list = []
-listen_port = {{ .TCPListenPort }}
+listen_port = {{ .RDMAListenPort }}
 listen_queue_depth = 4096
 rdma_accept_timeout = '15s'
 rdma_listen_ethernet = true
@@ -235,7 +235,7 @@ default_report_metrics = false
 default_send_retry_times = 1
 default_timeout = '1s'
 enable_rdma_control = false
-force_use_tcp = false
+force_use_tcp = true
 
 [server.client.io_worker]
 num_event_loop = 1
@@ -326,7 +326,7 @@ default_report_metrics = false
 default_send_retry_times = 1
 default_timeout = '1s'
 enable_rdma_control = false
-force_use_tcp = false
+force_use_tcp = true
 
 [server.forward_client.io_worker]
 num_event_loop = 1
@@ -396,9 +396,9 @@ mgmtd_server_addresses = {{ .MgmtdServerAddresses }}
 work_queue_size = 100
 
 [server.reliable_forwarding]
-max_inline_forward_bytes = '0'
-retry_first_wait = '100ms'
-retry_max_wait = '1s'
+max_inline_forward_bytes = '0' 
+retry_first_wait = '2000ms'
+retry_max_wait = '5s'
 retry_total_time = '1min'
 
 [server.reliable_update]

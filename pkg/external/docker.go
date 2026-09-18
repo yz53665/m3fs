@@ -17,6 +17,7 @@ package external
 import (
 	"context"
 	"fmt"
+	"strconv"
 
 	"github.com/open3fs/m3fs/pkg/errors"
 	"github.com/open3fs/m3fs/pkg/log"
@@ -108,6 +109,9 @@ func (de *dockerExternal) Run(ctx context.Context, args *RunArgs) (out string, e
 	}
 	if args.Privileged != nil && *args.Privileged {
 		params = append(params, "--privileged")
+	}
+	for _, dev := range args.Devices {
+		params = append(params, "--device", dev)
 	}
 	for key, val := range args.Ulimits {
 		params = append(params, "--ulimit", fmt.Sprintf("%s=%s", key, val))

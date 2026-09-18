@@ -197,6 +197,7 @@ func createCluster(ctx *cli.Context) error {
 		new(mgmtd.CreateMgmtdServiceTask),
 		new(meta.CreateMetaServiceTask),
 		&storage.CreateStorageServiceTask{
+			DeleteContainerIfExists: true,
 			StorageNodes: cfg.Services.Storage.Nodes,
 			BeginNodeID:  10001,
 		},

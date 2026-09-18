@@ -136,6 +136,9 @@ func (s *genAdminCliConfigStep) Execute(ctx context.Context) error {
 
 	mgmtdServerAddresses := make([]string, len(s.Runtime.Services.Mgmtd.Nodes))
 	port := strconv.Itoa(s.Runtime.Services.Mgmtd.RDMAListenPort)
+	if s.Runtime.MgmtdProtocol == "TCP" {
+		port = strconv.Itoa(s.Runtime.Services.Mgmtd.TCPListenPort)
+	}
 	for i, nodeName := range s.Runtime.Services.Mgmtd.Nodes {
 		node := s.Runtime.Nodes[nodeName]
 		mgmtdServerAddresses[i] = fmt.Sprintf(`"%s://%s"`,
@@ -147,6 +150,7 @@ func (s *genAdminCliConfigStep) Execute(ctx context.Context) error {
 	adminCliData := map[string]any{
 		"ClusterID":            s.Runtime.Cfg.Name,
 		"MgmtdServerAddresses": mgmtdServerAddressesStr,
+		"MgmtdProtocol":        s.Runtime.MgmtdProtocol,
 	}
 	s.Logger.Debugf("Admin cli config template data: %v", adminCliData)
 	t, err := template.New("admin_cli.toml").Parse(string(AdminCliTomlTmpl))
@@ -187,6 +191,7 @@ type prepare3FSConfigStep struct {
 	rdmaListenPort       int
 	tcpListenPort        int
 	extraMainTomlData    map[string]any
+	extraLauncherTomlData map[string]any
 	extraConfigFilesFunc func(*task.Runtime) []*Extra3FSConfigFile
 }
 
@@ -289,6 +294,9 @@ func (s *prepare3FSConfigStep) genConfigs(tmpDir string) error {
 		"HostMountpoint":       s.Runtime.Cfg.Services.Client.HostMountpoint,
 		"MgmtdServerAddresses": mgmtdServerAddresses,
 	}
+	for k, v := range s.extraLauncherTomlData {
+		launcherTmplData[k] = v
+	}
 	s.Logger.Debugf("Template data of %s_launcher.toml.tmpl: %v", s.service, launcherTmplData)
 	if err := s.genConfig(mainLauncherToml, fmt.Sprintf("%s_launcher.toml", s.service),
 		s.mainLauncherTomlTmpl, launcherTmplData); err != nil {
@@ -357,6 +365,7 @@ type Prepare3FSConfigStepSetup struct {
 	RDMAListenPort          int
 	TCPListenPort           int
 	ExtraMainTomlData       map[string]any
+	ExtraLauncherTomlData   map[string]any
 	Extra3FSConfigFilesFunc func(*task.Runtime) []*Extra3FSConfigFile
 }
 
@@ -372,6 +381,7 @@ func NewPrepare3FSConfigStepFunc(setup *Prepare3FSConfigStepSetup) func() task.S
 			rdmaListenPort:       setup.RDMAListenPort,
 			tcpListenPort:        setup.TCPListenPort,
 			extraMainTomlData:    setup.ExtraMainTomlData,
+			extraLauncherTomlData:setup.ExtraLauncherTomlData,
 			extraConfigFilesFunc: setup.Extra3FSConfigFilesFunc,
 		}
 	}
@@ -388,6 +398,7 @@ type run3FSContainerStep struct {
 	extraVolumes   []*external.VolumeArgs
 	useRdmaNetwork bool
 	modelObjFunc   func(r *task.BaseStep) any
+	devices        []string
 }
 
 func (s *run3FSContainerStep) getContainerNames(ctx context.Context) (*utils.Set[string], error) {
@@ -454,7 +465,29 @@ func (s *run3FSContainerStep) Execute(ctx context.Context) error {
 			},
 		},
 	}
+	// Append configurable volume mounts (e.g. CANN, Ascend)
+	for _, vm := range s.Runtime.Cfg.VolumeMounts {
+		target := vm.Target
+		if target == "" {
+			target = vm.Source
+		}
+		args.Volumes = append(args.Volumes, &external.VolumeArgs{
+			Source: vm.Source,
+			Target: target,
+		})
+	}
 	args.Volumes = append(args.Volumes, s.extraVolumes...)
+	args.Devices = append(args.Devices, s.devices...)
+
+	if node, ok := s.Runtime.Nodes[s.Node.Name]; ok && len(node.ExtraEnvs) > 0 {
+		if args.Envs == nil {
+			args.Envs = make(map[string]string, len(node.ExtraEnvs))
+		}
+		for k, v := range node.ExtraEnvs {
+			args.Envs[k] = v
+		}
+		s.Logger.Infof("Inject extra envs on node %s: %v", s.Node.Name, node.ExtraEnvs)
+	}
 
 	if s.useRdmaNetwork {
 		if err := s.GetErdmaSoPath(ctx); err != nil {
@@ -507,6 +540,7 @@ type Run3FSContainerStepSetup struct {
 	UseRdmaNetwork bool
 	ModelObjFunc   func(r *task.BaseStep) any
 	DeleteIfExists bool
+	Devices        []string
 }
 
 // NewRun3FSContainerStepFunc is run3FSContainer factory func.
@@ -521,6 +555,7 @@ func NewRun3FSContainerStepFunc(setup *Run3FSContainerStepSetup) func() task.Ste
 			useRdmaNetwork: setup.UseRdmaNetwork,
 			modelObjFunc:   setup.ModelObjFunc,
 			deleteIfExists: setup.DeleteIfExists,
+			devices:        setup.Devices,
 		}
 	}
 }
@@ -621,7 +656,22 @@ func (s *upload3FSMainConfigStep) Execute(ctx context.Context) error {
 				Source: "/dev",
 				Target: "/dev",
 			},
+			{
+				Source: path.Join(s.serviceWorkDir, "log"),
+				Target: "/var/log/3fs",
+			},
 		},
+	}
+	// Append configurable volume mounts (e.g. CANN, Ascend)
+	for _, vm := range s.Runtime.Cfg.VolumeMounts {
+		target := vm.Target
+		if target == "" {
+			target = vm.Source
+		}
+		args.Volumes = append(args.Volumes, &external.VolumeArgs{
+			Source: vm.Source,
+			Target: target,
+		})
 	}
 
 	if err := s.GetErdmaSoPath(ctx); err != nil {

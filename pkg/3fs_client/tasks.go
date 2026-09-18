@@ -82,6 +82,21 @@ func (t *Create3FSClientServiceTask) Init(r *task.Runtime, logger log.Interface)
 			Rshare: common.Pointer(true),
 		})
 	}
+	runContainerVolumes = append(runContainerVolumes, &external.VolumeArgs{
+		Source: "/home/ssu/ramdisk",
+		Target: "/home/ssu/ramdisk",
+	})
+
+	for _, vm := range client.ExtraVolumeMounts {
+		target := vm.Target
+		if target == "" {
+			target = vm.Source
+		}
+		runContainerVolumes = append(runContainerVolumes, &external.VolumeArgs{
+			Source: vm.Source,
+			Target: target,
+		})
+	}
 	workDir := getServiceWorkDir(r.WorkDir)
 	t.SetSteps([]task.StepConfig{
 		{
@@ -125,7 +140,8 @@ func (t *Create3FSClientServiceTask) Init(r *task.Runtime, logger log.Interface)
 					Service:        ServiceName,
 					WorkDir:        workDir,
 					ExtraVolumes:   runContainerVolumes,
-					UseRdmaNetwork: true,
+					Devices:        client.ExtraDevices,
+					UseRdmaNetwork: r.Cfg.NetworkType != config.NetworkTypeTCP,
 					ModelObjFunc: func(s *task.BaseStep) any {
 						return &model.FuseClient{
 							Name:           r.Services.Client.ContainerName,

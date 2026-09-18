@@ -85,7 +85,7 @@ default_report_metrics = false
 default_send_retry_times = 1
 default_timeout = '1s'
 enable_rdma_control = false
-force_use_tcp = false
+force_use_tcp = true
 
 [server.background_client.io_worker]
 num_event_loop = 1
@@ -168,7 +168,7 @@ proc_thread_pool_stratetry = 'SHARED_QUEUE'
 [[server.base.groups]]
 check_connections_interval = '1min'
 connection_expiration_time = '1day'
-network_type = 'RDMA'
+network_type = '{{ .MgmtdProtocol }}'
 services = [ 'MetaSerde' ]
 use_independent_thread_pool = false
 
@@ -210,7 +210,7 @@ max_connections = 1
 [server.base.groups.listener]
 domain_socket_index = 1
 filter_list = []
-listen_port = {{ .RDMAListenPort }}
+listen_port = {{ if eq .MgmtdProtocol "TCP" }}{{ .TCPListenPort }}{{ else }}{{ .RDMAListenPort }}{{ end }}
 listen_queue_depth = 4096
 rdma_accept_timeout = '15s'
 rdma_listen_ethernet = true
@@ -268,7 +268,7 @@ max_connections = 1
 [server.base.groups.listener]
 domain_socket_index = 1
 filter_list = []
-listen_port = {{ .TCPListenPort }}
+listen_port = {{ .RDMAListenPort }}
 listen_queue_depth = 4096
 rdma_accept_timeout = '15s'
 rdma_listen_ethernet = true
@@ -366,7 +366,7 @@ max_row_group_length = 100000
 trace_file_dir = '.'
 
 [server.meta.forward]
-addr_type = 'RDMA'
+addr_type = '{{ .MgmtdProtocol }}'
 debug = true
 timeout = '10s'
 
@@ -462,7 +462,7 @@ default_report_metrics = false
 default_send_retry_times = 1
 default_timeout = '1s'
 enable_rdma_control = false
-force_use_tcp = false
+force_use_tcp = true
 
 [server.storage_client.net_client.io_worker]
 num_event_loop = 1
@@ -528,7 +528,7 @@ default_report_metrics = false
 default_send_retry_times = 1
 default_timeout = '1s'
 enable_rdma_control = false
-force_use_tcp = false
+force_use_tcp = true
 
 [server.storage_client.net_client_for_updates.io_worker]
 num_event_loop = 1

@@ -159,9 +159,12 @@ func (s *runContainerStep) Execute(ctx context.Context) error {
 
 	err = steps.WaitUtilWithTimeout(ctx, fmt.Sprintf("postgresql container %s ready", pgCfg.ContainerName),
 		func() (bool, error) {
-			_, err := s.Em.Docker.Exec(ctx, pgCfg.ContainerName, "pg_isready", "-U", pgCfg.Username)
+			_, err := s.Em.Docker.Exec(ctx, pgCfg.ContainerName,
+				"bash", "-c",
+				fmt.Sprintf("PGPASSWORD=%s psql -h 127.0.0.1 -U %s -d %s -c 'SELECT 1'",
+					pgCfg.Password, pgCfg.Username, pgCfg.Database))
 			if err != nil {
-				s.Logger.Debugf("Run pg_isready failed: %s", err)
+				s.Logger.Debugf("Run psql check failed: %s", err)
 				return false, nil
 			}
 			return true, nil

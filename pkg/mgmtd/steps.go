@@ -96,12 +96,16 @@ func (s *initClusterStep) Execute(ctx context.Context) error {
 		Name:       &mgmtd.ContainerName,
 		Entrypoint: common.Pointer("''"),
 		Rm:         common.Pointer(true),
+		Privileged: common.Pointer(true),
 		Command: []string{
 			"/opt/3fs/bin/admin_cli",
 			"-cfg", "/opt/3fs/etc/admin_cli.toml",
 			fmt.Sprintf("'init-cluster --mgmtd /opt/3fs/etc/mgmtd_main.toml 1 %d %d'",
 				mgmtd.ChunkSize, mgmtd.StripeSize)},
 		HostNetwork: true,
+		Ulimits: map[string]string{
+			"nofile": "1048576:1048576",
+		},
 		Volumes: []*external.VolumeArgs{
 			{
 				Source: "/dev",
@@ -415,6 +419,11 @@ func (s *createChainAndTargetModelStep) createTargets(
 		}
 		targetID := fs[0]
 		chainID := fs[1]
+		// Skip offline/unassigned targets (node ID or disk index is "N/A").
+		if fs[5] == "N/A" || fs[6] == "N/A" {
+			s.Logger.Infof("skipping unassigned target: %s", line)
+			continue
+		}
 		nodeID, err := strconv.ParseInt(fs[5], 10, 64)
 		if err != nil {
 			return errors.Annotatef(err, "parse node id %s for target '%s'", fs[5], line)

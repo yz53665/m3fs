@@ -57,7 +57,7 @@ func (t *PrepareNetworkTask) Init(r *task.Runtime, logger log.Interface) {
 		}
 		steps = append(steps, erdmaSteps...)
 	}
-	if r.Cfg.NetworkType != config.NetworkTypeRDMA {
+	if r.Cfg.NetworkType != config.NetworkTypeRDMA && r.Cfg.NetworkType != config.NetworkTypeTCP {
 		steps = append(steps, task.StepConfig{
 			Nodes:   nodes,
 			NewStep: func() task.Step { return new(genIbdev2netdevScriptStep) },

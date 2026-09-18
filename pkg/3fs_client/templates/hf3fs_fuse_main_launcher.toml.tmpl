@@ -11,7 +11,7 @@ default_report_metrics = false
 default_send_retry_times = 1
 default_timeout = '1s'
 enable_rdma_control = false
-force_use_tcp = false
+force_use_tcp = true
 
 [client.io_worker]
 num_event_loop = 1
@@ -70,7 +70,7 @@ num_proc_threads = 2
 proc_thread_pool_stratetry = 'SHARED_QUEUE'
 
 [ib_devices]
-allow_no_usable_devices = false
+allow_no_usable_devices = true
 allow_unknown_zone = true
 default_network_zone = 'UNKNOWN'
 default_pkey_index = 0

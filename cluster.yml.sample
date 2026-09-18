@@ -21,6 +21,21 @@ ui:
   # Supported values: "green", "cyan", "yellow", "blue", "magenta", "red", "white"
   # Default value is "green"
   taskInfoColor: "green"
+# volumeMounts defines extra host-to-container volume mounts for 3fs containers
+# (storage, meta, mgmtd, client, and admin_cli). This is typically used for
+# NPU/CANN/Ascend runtime libraries that the image expects to find at runtime.
+# - source: host path (configurable per deployment)
+# - target: in-container path (already mapped/exported in the image).
+#           If omitted, source is used as target.
+# When the host CANN path differs from what the image's env vars expect,
+# use source/target to remap. Example:
+#   source: "/usr/local/Ascend/cann-9.2.0"  (actual host path)
+#   target: "/home/ssu/cann_b125/cann-9.1.0" (path image env vars expect)
+volumeMounts:
+  - source: "/home/ssu/cann_b125/cann-9.1.0"
+    target: "/home/ssu/cann_b125/cann-9.1.0"
+  - source: "/usr/local/Ascend"
+    target: "/usr/local/Ascend"
 nodes:
   - name: node1
     # host is the ip of a 3fs node. 
@@ -34,6 +49,8 @@ nodes:
     host: "192.168.1.2"
     username: "root"
     password: "password"
+    extraEnvs:
+      NPU_RH2D_FLAG: "1"
 # nodeGroups is used to defines a group of nodes in a ip range with same username and password configuration
 nodeGroups:
     # name is the name of node group
@@ -59,6 +76,23 @@ services:
     # hostMountpoint defines the mount point for 3fs on the client node.
     # Default value is "/mnt/3fs"
     hostMountpoint: /mnt/3fs
+    # extraDevices defines client-only device mounts (docker --device),
+    extraDevices:
+      - /dev/davinci_manager
+      - /dev/hisi_hdc
+      - /dev/ummu
+      - /dev/uburma
+      - /dev/davinci0
+      - /dev/davinci1
+      - /dev/davinci2
+      - /dev/davinci3
+      - /dev/davinci4
+      - /dev/davinci5
+      - /dev/davinci6
+      - /dev/davinci7
+    # extraVolumeMounts defines client-only host-to-container volume mounts
+    extraVolumeMounts:
+      - source: /usr/local/sbin/npu-smi
   storage:
     # containerName defines the container name of 3fs storage.
     # Default value is 3fs-storage.

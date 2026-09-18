@@ -80,11 +80,14 @@ func init() {
 	}
 }
 
-func makeTargetPaths(diskNum int) string {
+func makeTargetPaths(diskNum int, basePath string) string {
+	if basePath == "" {
+		basePath = path.Join("/mnt", "3fsdata")
+	}
 	targets := make([]string, diskNum)
 	for i := 0; i < diskNum; i++ {
 		targets[i] = fmt.Sprintf(`"%s"`,
-			path.Join("/mnt", "3fsdata", "data"+strconv.Itoa(i), "3fs"))
+			path.Join(basePath, "data"+strconv.Itoa(i), "3fs"))
 	}
 
 	return fmt.Sprintf("[%s]", strings.Join(targets, ","))
@@ -122,6 +125,7 @@ func (t *CreateStorageServiceTask) Init(r *task.Runtime, logger log.Interface) {
 	for i, node := range t.StorageNodes {
 		nodes[i] = r.Nodes[node]
 	}
+	fmt.Printf("DEBUG: diskNum=%d basePath=%q diskType=%q\n", storage.DiskNumPerNode, storage.DiskBasePath, storage.DiskType)
 	t.SetSteps([]task.StepConfig{
 		{
 			Nodes:   []config.Node{nodes[0]},
@@ -138,19 +142,39 @@ func (t *CreateStorageServiceTask) Init(r *task.Runtime, logger log.Interface) {
 		{
 			Nodes:    nodes,
 			Parallel: true,
-			NewStep: steps.NewRemoteRunScriptStepFunc(
-				workDir,
-				"disk_tool.sh",
-				DiskToolScriptTmpl,
-				map[string]any{
-					"SectorSize": t.Runtime.Cfg.Services.Storage.SectorSize,
-				},
-				[]string{
+			NewStep: func() task.Step {
+				if storage.DiskBasePath != "" {
+					// When DiskBasePath is set, create directories directly
+					// at the host path (e.g. /home/ssu/ramdisk/data0/3fs)
+					return steps.NewRemoteRunScriptStepFunc(
+						workDir,
+						"disk_tool.sh",
+						DiskToolScriptTmpl,
+						map[string]any{
+							"SectorSize": t.Runtime.Cfg.Services.Storage.SectorSize,
+						},
+						[]string{
+							storage.DiskBasePath,
+							strconv.Itoa(storage.DiskNumPerNode),
+							string(storage.DiskType),
+							"prepare",
+							storage.DiskBasePath,
+						})()
+				}
+				return steps.NewRemoteRunScriptStepFunc(
 					workDir,
-					strconv.Itoa(storage.DiskNumPerNode),
-					string(storage.DiskType),
-					"prepare",
-				}),
+					"disk_tool.sh",
+					DiskToolScriptTmpl,
+					map[string]any{
+						"SectorSize": t.Runtime.Cfg.Services.Storage.SectorSize,
+					},
+					[]string{
+						workDir,
+						strconv.Itoa(storage.DiskNumPerNode),
+						string(storage.DiskType),
+						"prepare",
+					})()
+			},
 		},
 		{
 			Nodes:    nodes,
@@ -164,7 +188,7 @@ func (t *CreateStorageServiceTask) Init(r *task.Runtime, logger log.Interface) {
 				RDMAListenPort:       storage.RDMAListenPort,
 				TCPListenPort:        storage.TCPListenPort,
 				ExtraMainTomlData: map[string]any{
-					"TargetPaths": makeTargetPaths(storage.DiskNumPerNode),
+					"TargetPaths": makeTargetPaths(storage.DiskNumPerNode, storage.DiskBasePath),
 				},
 			}),
 		},
@@ -188,13 +212,27 @@ func (t *CreateStorageServiceTask) Init(r *task.Runtime, logger log.Interface) {
 					Service:        ServiceName,
 					WorkDir:        workDir,
 					DeleteIfExists: t.DeleteContainerIfExists,
-					UseRdmaNetwork: true,
-					ExtraVolumes: []*external.VolumeArgs{
+					UseRdmaNetwork: r.Cfg.NetworkType != config.NetworkTypeTCP,
+					ExtraVolumes: func() []*external.VolumeArgs {
+					basePath := storage.DiskBasePath
+					if basePath == "" {
+						basePath = "/mnt/3fsdata"
+						return []*external.VolumeArgs{
+							{
+								Source: path.Join(workDir, "3fsdata"),
+								Target: basePath,
+							},
+						}
+					}
+					// When DiskBasePath is set, mount the host path directly
+					// (e.g. /home/ssu/ramdisk -> /home/ssu/ramdisk in container)
+					return []*external.VolumeArgs{
 						{
-							Source: path.Join(workDir, "3fsdata"),
-							Target: "/mnt/3fsdata",
+							Source: basePath,
+							Target: basePath,
 						},
-					},
+					}
+				}(),
 					ModelObjFunc: func(s *task.BaseStep) any {
 						fsNodeID, _ := s.Runtime.LoadInt(
 							steps.GetNodeIDKey(ServiceName, s.Node.Name))
@@ -244,19 +282,37 @@ func (t *DeleteStorageServiceTask) Init(r *task.Runtime, logger log.Interface) {
 		{
 			Nodes:    nodes,
 			Parallel: true,
-			NewStep: steps.NewRemoteRunScriptStepFunc(
-				workDir,
-				"disk_tool.sh",
-				DiskToolScriptTmpl,
-				map[string]any{
-					"SectorSize": t.Runtime.Cfg.Services.Storage.SectorSize,
-				},
-				[]string{
+			NewStep: func() task.Step {
+				if storage.DiskBasePath != "" {
+					return steps.NewRemoteRunScriptStepFunc(
+						workDir,
+						"disk_tool.sh",
+						DiskToolScriptTmpl,
+						map[string]any{
+							"SectorSize": t.Runtime.Cfg.Services.Storage.SectorSize,
+						},
+						[]string{
+							storage.DiskBasePath,
+							strconv.Itoa(storage.DiskNumPerNode),
+							string(storage.DiskType),
+							"clear",
+							storage.DiskBasePath,
+						})()
+				}
+				return steps.NewRemoteRunScriptStepFunc(
 					workDir,
-					strconv.Itoa(storage.DiskNumPerNode),
-					string(storage.DiskType),
-					"clear",
-				}),
+					"disk_tool.sh",
+					DiskToolScriptTmpl,
+					map[string]any{
+						"SectorSize": t.Runtime.Cfg.Services.Storage.SectorSize,
+					},
+					[]string{
+						workDir,
+						strconv.Itoa(storage.DiskNumPerNode),
+						string(storage.DiskType),
+						"clear",
+					})()
+			},
 		},
 		{
 			Nodes:   nodes,

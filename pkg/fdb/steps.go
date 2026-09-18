@@ -86,6 +86,8 @@ func (s *runContainerStep) Execute(ctx context.Context) error {
 		Detach:        common.Pointer(true),
 		Envs: map[string]string{
 			"FDB_CLUSTER_FILE_CONTENTS": clusterContent,
+			"FDB_NETWORKING_MODE":       "host",
+			"FDB_PORT":                  strconv.Itoa(s.Runtime.Services.Fdb.Port),
 		},
 		Volumes: []*external.VolumeArgs{
 			{

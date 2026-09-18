@@ -38,7 +38,7 @@ default_report_metrics = false
 default_send_retry_times = 1
 default_timeout = '1s'
 enable_rdma_control = false
-force_use_tcp = false
+force_use_tcp = true
 
 [client.io_worker]
 num_event_loop = 1
@@ -170,7 +170,7 @@ lo = 8
 check_server_interval = '5s'
 dynamic_stripe = true
 max_concurrent_requests = 128
-network_type = 'RDMA'
+network_type = '{{ .MgmtdProtocol }}'
 remove_chunks_batch_size = 32
 remove_chunks_max_iters = 1024
 selection_mode = 'RandomFollow'
@@ -236,7 +236,7 @@ default_report_metrics = false
 default_send_retry_times = 1
 default_timeout = '1s'
 enable_rdma_control = false
-force_use_tcp = false
+force_use_tcp = true
 
 [storage.net_client.io_worker]
 num_event_loop = 1
@@ -302,7 +302,7 @@ default_report_metrics = false
 default_send_retry_times = 1
 default_timeout = '1s'
 enable_rdma_control = false
-force_use_tcp = false
+force_use_tcp = true
 
 [storage.net_client_for_updates.io_worker]
 num_event_loop = 1

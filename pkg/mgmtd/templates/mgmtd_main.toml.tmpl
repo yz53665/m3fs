@@ -122,7 +122,7 @@ max_connections = 1
 [server.base.groups.listener]
 domain_socket_index = 1
 filter_list = []
-listen_port = {{ .RDMAListenPort }}
+listen_port = {{ if eq .MgmtdProtocol "TCP" }}{{ .TCPListenPort }}{{ else }}{{ .RDMAListenPort }}{{ end }}
 listen_queue_depth = 4096
 rdma_accept_timeout = '15s'
 rdma_listen_ethernet = true
@@ -180,7 +180,7 @@ max_connections = 1
 [server.base.groups.listener]
 domain_socket_index = 1
 filter_list = []
-listen_port = {{ .TCPListenPort }}
+listen_port = {{ .RDMAListenPort }}
 listen_queue_depth = 4096
 rdma_accept_timeout = '15s'
 rdma_listen_ethernet = true

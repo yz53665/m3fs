@@ -80,7 +80,7 @@ func (t *CreateMgmtdServiceTask) Init(r *task.Runtime, logger log.Interface) {
 					ContainerName:  r.Services.Mgmtd.ContainerName,
 					Service:        ServiceName,
 					WorkDir:        getServiceWorkDir(r.WorkDir),
-					UseRdmaNetwork: true,
+					UseRdmaNetwork: r.Cfg.NetworkType != config.NetworkTypeTCP,
 					ModelObjFunc: func(s *task.BaseStep) any {
 						fsNodeID, _ := s.Runtime.LoadInt(
 							steps.GetNodeIDKey(ServiceName, s.Node.Name))

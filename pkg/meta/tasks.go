@@ -66,6 +66,9 @@ func (t *CreateMetaServiceTask) Init(r *task.Runtime, logger log.Interface) {
 				MainTomlTmpl:         MetaMainTomlTmpl,
 				RDMAListenPort:       r.Services.Meta.RDMAListenPort,
 				TCPListenPort:        r.Services.Meta.TCPListenPort,
+				// ExtraMainTomlData: map[string]any{
+				// 	"DeviceFilter": []string{"mlx5_0", "mlx5_1", "mlx5_2", "mlx5_3"},
+				// },
 			}),
 		},
 		{
@@ -87,7 +90,7 @@ func (t *CreateMetaServiceTask) Init(r *task.Runtime, logger log.Interface) {
 					ContainerName:  r.Services.Meta.ContainerName,
 					Service:        ServiceName,
 					WorkDir:        workDir,
-					UseRdmaNetwork: true,
+					UseRdmaNetwork: r.Cfg.NetworkType != config.NetworkTypeTCP,
 					ModelObjFunc: func(s *task.BaseStep) any {
 						fsNodeID, _ := s.Runtime.LoadInt(
 							steps.GetNodeIDKey(ServiceName, s.Node.Name))

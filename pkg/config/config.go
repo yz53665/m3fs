@@ -33,9 +33,10 @@ const (
 	NetworkTypeRDMA  NetworkType = "RDMA"
 	NetworkTypeRXE   NetworkType = "RXE"
 	NetworkTypeERDMA NetworkType = "ERDMA"
+	NetworkTypeTCP   NetworkType = "TCP"
 )
 
-var networkTypes = utils.NewSet(NetworkTypeIB, NetworkTypeRDMA, NetworkTypeRXE, NetworkTypeERDMA)
+var networkTypes = utils.NewSet(NetworkTypeIB, NetworkTypeRDMA, NetworkTypeRXE, NetworkTypeERDMA, NetworkTypeTCP)
 
 // DiskType is the type of disk definition
 type DiskType string
@@ -56,6 +57,7 @@ type Node struct {
 	Username      string
 	Password      *string  `yaml:",omitempty"`
 	RDMAAddresses []string `yaml:"rdmaAddresses,omitempty"`
+	ExtraEnvs     map[string]string `yaml:"extraEnvs,omitempty"`
 }
 
 // NodeGroup is the node group config definition
@@ -89,6 +91,7 @@ type Fdb struct {
 	Nodes              []string `yaml:"nodes"`
 	NodeGroups         []string `yaml:"nodeGroups"`
 	Port               int      `yaml:"port"`
+	DataDir            string   `yaml:"dataDir"`
 	WaitClusterTimeout time.Duration
 }
 
@@ -148,6 +151,7 @@ type Storage struct {
 	DiskType                 DiskType      `yaml:"diskType,omitempty"`
 	SectorSize               int           `yaml:"sectorSize,omitempty"`
 	DiskNumPerNode           int           `yaml:"diskNumPerNode,omitempty"`
+	DiskBasePath             string        `yaml:"diskBasePath,omitempty"`
 	RDMAListenPort           int           `yaml:"rdmaListenPort,omitempty"`
 	TCPListenPort            int           `yaml:"tcpListenPort,omitempty"`
 	ReplicationFactor        int           `yaml:"replicationFactor,omitempty"`
@@ -164,6 +168,8 @@ type Client struct {
 	Nodes          []string `yaml:"nodes"`
 	NodeGroups     []string `yaml:"nodeGroups"`
 	HostMountpoint string   `yaml:"hostMountpoint"`
+	ExtraVolumeMounts []VolumeMount `yaml:"extraVolumeMounts,omitempty"`
+	ExtraDevices []string `yaml:"extraDevices,omitempty"`
 }
 
 // Services is the services config definition
@@ -184,6 +190,14 @@ type UIConfig struct {
 	TaskInfoColor string `yaml:"taskInfoColor,omitempty"`
 }
 
+// VolumeMount defines an extra host-to-container volume mount.
+// Source is the host path (configurable); Target is the in-container path
+// (already mapped/exported in the image). If Target is empty, Source is used.
+type VolumeMount struct {
+	Source string `yaml:"source"`
+	Target string `yaml:"target,omitempty"`
+}
+
 // Config is the 3fs cluster config definition
 type Config struct {
 	Name                string
@@ -195,6 +209,7 @@ type Config struct {
 	Services            Services       `yaml:"services"`
 	Images              Images         `yaml:"images"`
 	UI                  UIConfig       `yaml:"ui,omitempty"`
+	VolumeMounts        []VolumeMount  `yaml:"volumeMounts,omitempty"`
 	CmdMaxExitTimeout   *time.Duration `yaml:",omitempty"`
 	ServiceBasePath     string         `yaml:"serviceBasePath,omitempty"`
 	CheckStatusTimeout  time.Duration
@@ -476,6 +491,15 @@ func (c *Config) SetValidate(workDir, registry string) error {
 		return errors.Trace(err)
 	}
 
+	// If volumeMounts is not configured (or explicitly emptied), set default
+	// mounts for CANN and Ascend to preserve backward compatibility.
+	if len(c.VolumeMounts) == 0 {
+		c.VolumeMounts = []VolumeMount{
+			{Source: "/home/ssu/cann_b125", Target: "/home/ssu/cann_b125"},
+			{Source: "/usr/local/Ascend", Target: "/usr/local/Ascend"},
+		}
+	}
+
 	return nil
 }
 
@@ -596,7 +620,7 @@ func NewConfigWithDefaults() *Config {
 				Database:         "open3fs",
 				ReadOnlyUsername: "postgres_readonly",
 				ReadOnlyPassword: "pgpassword_readonly",
-				WaitReadyTimeout: 30 * time.Second,
+				WaitReadyTimeout: 60 * time.Second,
 			},
 			Fdb: Fdb{
 				ContainerName:      "3fs-fdb",
@@ -677,5 +701,9 @@ func NewConfigWithDefaults() *Config {
 		ServiceBasePath:     "/lib/systemd/system/",
 		CheckStatusTimeout:  5 * time.Minute,
 		CheckStatusInterval: 5 * time.Second,
+		VolumeMounts: []VolumeMount{
+			{Source: "/home/ssu/cann_b125", Target: "/home/ssu/cann_b125"},
+			{Source: "/usr/local/Ascend", Target: "/usr/local/Ascend"},
+		},
 	}
 }

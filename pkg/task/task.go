@@ -220,6 +220,9 @@ func (s *BaseStep) GetRdmaVolumes() []*external.VolumeArgs {
 	if s.Runtime.Cfg.NetworkType == config.NetworkTypeIB {
 		return volumes
 	}
+	if s.Runtime.Cfg.NetworkType == config.NetworkTypeTCP {
+		return volumes
+	}
 
 	if s.Runtime.Cfg.NetworkType != config.NetworkTypeRDMA {
 		ibdev2netdevScriptPath := path.Join(s.Runtime.Cfg.WorkDir, "bin", "ibdev2netdev")
@@ -307,12 +310,32 @@ func (s *BaseStep) CreateScriptAndService(
 		return errors.Annotatef(err, "write remote file %s", servicePath)
 	}
 
-	if _, err = s.Em.Runner.Exec(ctx, "systemctl", "enable", serviceName); err != nil {
-		return errors.Annotatef(err, "enable %s", serviceName)
+	// Skip systemctl operations if serviceBasePath is not a standard systemd directory
+	// This allows non-root deployments to create services without systemd integration
+	standardSystemdPaths := []string{
+		"/lib/systemd/system/",
+		"/etc/systemd/system/",
+		"/usr/lib/systemd/system/",
+	}
+	isStandardPath := false
+	for _, stdPath := range standardSystemdPaths {
+		if strings.HasPrefix(s.Runtime.Cfg.ServiceBasePath, stdPath) {
+			isStandardPath = true
+			break
+		}
 	}
 
-	if _, err = s.Em.Runner.Exec(ctx, "systemctl", "daemon-reload"); err != nil {
-		return errors.Annotate(err, "daemon reload")
+	if isStandardPath {
+		if _, err = s.Em.Runner.Exec(ctx, "systemctl", "enable", serviceName); err != nil {
+			return errors.Annotatef(err, "enable %s", serviceName)
+		}
+
+		if _, err = s.Em.Runner.Exec(ctx, "systemctl", "daemon-reload"); err != nil {
+			return errors.Annotate(err, "daemon reload")
+		}
+	} else {
+		s.Logger.Infof("Skipping systemctl enable/disable for %s (non-standard service path: %s)", 
+			serviceName, s.Runtime.Cfg.ServiceBasePath)
 	}
 
 	return nil
@@ -329,16 +352,35 @@ func (s *BaseStep) DeleteService(ctx context.Context, serviceName string) error 
 		return nil
 	}
 
-	if _, err := s.Em.Runner.Exec(ctx, "systemctl", "disable", serviceName); err != nil {
-		return errors.Annotatef(err, "disable %s", serviceName)
+	// Skip systemctl operations if serviceBasePath is not a standard systemd directory
+	standardSystemdPaths := []string{
+		"/lib/systemd/system/",
+		"/etc/systemd/system/",
+		"/usr/lib/systemd/system/",
+	}
+	isStandardPath := false
+	for _, stdPath := range standardSystemdPaths {
+		if strings.HasPrefix(s.Runtime.Cfg.ServiceBasePath, stdPath) {
+			isStandardPath = true
+			break
+		}
+	}
+
+	if isStandardPath {
+		if _, err := s.Em.Runner.Exec(ctx, "systemctl", "disable", serviceName); err != nil {
+			return errors.Annotatef(err, "disable %s", serviceName)
+		}
+
+		if _, err := s.Em.Runner.Exec(ctx, "systemctl", "daemon-reload"); err != nil {
+			return errors.Annotate(err, "daemon reload")
+		}
+	} else {
+		s.Logger.Infof("Skipping systemctl disable for %s (non-standard service path: %s)",
+			serviceName, s.Runtime.Cfg.ServiceBasePath)
 	}
 
 	if err := s.Em.FS.RemoveAll(ctx, servicePath); err != nil {
 		return errors.Trace(err)
-	}
-
-	if _, err := s.Em.Runner.Exec(ctx, "systemctl", "daemon-reload"); err != nil {
-		return errors.Annotate(err, "daemon reload")
 	}
 
 	return nil
