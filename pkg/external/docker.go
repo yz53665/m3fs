@@ -17,7 +17,6 @@ package external
 import (
 	"context"
 	"fmt"
-	"strconv"
 
 	"github.com/open3fs/m3fs/pkg/errors"
 	"github.com/open3fs/m3fs/pkg/log"
@@ -70,6 +69,7 @@ type RunArgs struct {
 	Volumes       []*VolumeArgs
 	Envs          map[string]string
 	RestartPolicy string
+	Devices       []string
 }
 
 // PublishArgs defines args for publishing a container port.

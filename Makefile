@@ -19,7 +19,7 @@ export BUILD_AT := $(shell date -u +'%Y-%m-%dT%T%Z')
 # Tag of the current commit, if any. If this is not "" then we are building a release
 export RELEASE_TAG := $(shell git tag -l --points-at HEAD| sort | head -n 1)
 # Last tag on this branch
-export LAST_TAG := $(shell git describe --tags --abbrev=0)
+export LAST_TAG := $(shell git describe --tags --abbrev=0 2>/dev/null || true)
 export BUILD_VERSION := $(or $(RELEASE_TAG), $(LAST_TAG))
 export TAG_BRANCH := .$(BRANCH)
 # If building HEAD or main then unset TAG_BRANCH
